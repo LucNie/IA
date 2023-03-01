@@ -1,71 +1,56 @@
 const brain = require('brain.js');
-const net = new brain.NeuralNetwork({});
+const net = new brain.NeuralNetwork( { hiddenLayers: [300] } );
 const fs = require('fs');
+const { normalize } = require('path');
 const path = require('path');
 
 const pathMnist = path.join(__dirname, './data/mnist_test.csv');
 const mnist = fs.readFileSync(pathMnist, 'utf8').split('\r').map(row => row.split(',').map(Number));
 
-
-/** NOTE
- * mnist each row is a 28x28 image, and the last column is the label
- * the first column is the label, and the rest are the pixels 
+/**
+ * mnist is a 28x28 image of a number from 0-9
+ * the first column is the number the image represents
+ * the rest of the columns are the pixel values
  */
 
-console.log('length of mnist: ', mnist.length);
-console.log('length of mnist[0]: ', mnist[0].length);
-for (let i = 0; i < mnist.length; i++) { // verify is all is a number
-    for (let j = 0; j < mnist[i].length; j++) {
-        // result is a number ?
-        // console.log('mnist[' + i + '][' + j + '] is a number: ', typeof mnist[i][j] === 'number');
-        if (typeof mnist[i][j] !== 'number') {
-            console.log('mnist[' + i + '][' + j + '] is not a number');
-        }
-    }
-}
-
-// process.exit();
-
-// train the network
-const trainingData = mnist.map(row => {
-    const input = row.slice(1);
-    const output = row[0];
+const normalizemnist = mnist.map(row => {
     return {
-        input,
-        output
+        input: row.slice(1) / 255,
+        output: [row[0] / 9] 
     }
 });
 
-// console.log('trainingData[0]: ', trainingData[52].output);
+const normalizemnist2 = mnist.map(row => { // set > 127 to 1, < 127 to 0
+    return {
+        input: row.slice(1).map(x => x > 127 ? 1 : 0),
+        output: [row[0] / 9]
+    }
+});
 
-net.train(trainingData, {  
-    iterations: 100, // the maximum times to iterate the training data --> number greater than 0
-    // errorThresh: 0.005, // error threshold to reach
-    log: true, // true to use console.log, when a function is supplied it is used --> Either true or a function
-    logPeriod: 10,
+
+const config = {
+    iterations: 100,
+    // errorThresh: 0.005,
+    log: true,
+    // logPeriod: 10,
     learningRate: 0.3,
-    // momentum: 0.1, // momentum, multiplier of last delta change (max: 1)
+    // momentum: 0.1,
     // callback: null,
     // callbackPeriod: 10,
     // timeout: Infinity
-});
+};
+// train with gpu
+net.train(normalizemnist2, config);
 
 
 // test the network
-const test = mnist.slice(0, 100).map(row => {
-    const input = row.slice(1); // the first column is the label
-    const output = row[0]; // the rest are the pixels
+const test = mnist.slice(0, 100).map(row => { // test the first 100 rows
     return {
-        input,
-        output
+        input: row.slice(1) / 255,
+        output: [row[0] / 9]
     }
 });
 
-// console.log(test[0].input);
 
-const result = net.run(test[0].input);
-console.log(result);
-
-// save the network
-// const pathNet = path.join(__dirname, './data/net.json');    
-// const json = net.toJSON();
+const output = net.run(test[99].input);
+console.log("test output: ", output * 9 , "expected: ", test[99].output * 9);
