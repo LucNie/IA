@@ -8,7 +8,7 @@ const pathMnist = path.join(__dirname, './data/mnist_test.csv');
 const mnist = fs.readFileSync(pathMnist, 'utf8').split('\r').map(row => row.split(',').map(Number));
 
 const config = {
-    iterations: 300,
+    iterations: 250,
     // errorThresh: 0.005,
     log: true,
     logPeriod: 10,
@@ -59,6 +59,15 @@ const test = mnist.slice(0, 100).map(row => { // test the first 100 rows
 
 for (let i = 0; i < 5; i++) {
     let _rand = Math.round(Math.random() * 100);
-    const output = Math.round(net.run(test[_rand].input));
+    const output = net.run(test[_rand].input);
     console.log("data : " + _rand," test output: ", output * 9, "expected: ", test[_rand].output * 9);
 }
+
+// save the network
+const json = net.toJSON();
+fs.writeFileSync('network.json', JSON.stringify(json));
+
+// load the network
+// const json = require('./network.json');
+// const net = new brain.NeuralNetwork().fromJSON(json);
+
