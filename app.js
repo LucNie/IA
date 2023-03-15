@@ -1,15 +1,16 @@
 const brain = require('brain.js');
-const net = new brain.NeuralNetwork({ hiddenLayers: [200] });
+const net = new brain.NeuralNetwork({ hiddenLayers: [20] });
 const fs = require('fs');
 const { normalize } = require('path');
 const path = require('path');
+const gpu = require('gpu.js');
 
 const pathMnist = path.join(__dirname, './data/mnist_test.csv');
 const mnist = fs.readFileSync(pathMnist, 'utf8').split('\r').map(row => row.split(',').map(Number));
 
 const config = {
-    iterations: 250,
-    // errorThresh: 0.005,
+    iterations: 1000,
+    errorThresh: 0.0001,
     log: true,
     logPeriod: 10,
     learningRate: 0.3,
@@ -49,6 +50,10 @@ const normalizemnist2 = mnist.map(row => { // set > 127 to 1, < 127 to 0
 net.train(normalizemnist2, config);
 
 
+
+
+
+
 // test the network
 const test = mnist.slice(0, 100).map(row => { // test the first 100 rows
     return {
@@ -71,3 +76,32 @@ fs.writeFileSync('network.json', JSON.stringify(json));
 // const json = require('./network.json');
 // const net = new brain.NeuralNetwork().fromJSON(json);
 
+async function asyncTrain(){
+    await net.trainAsync(normalizemnist2, config);
+    
+    // test the network
+    const test = mnist.slice(0, 100).map(row => { // test the first 100 rows
+        return {
+            input: row.slice(1).map(x => x > 127 ? 1 : 0),
+            output: [row[0] / 9]
+        }
+    });
+    let _result = [];
+    for (let i = 0; i < 200; i++) {
+        
+        let _rand = Math.round(Math.random() * 99);
+        const output = net.run(test[_rand].input);
+        console.log("data : " + _rand," test output: ", output * 9, "expected: ", test[_rand].output * 9);
+        _result.push({
+            data : _rand,
+            test_output : output * 9,
+            expected : test[_rand].output * 9
+        });
+    }
+
+    return _result;
+}
+
+module.exports = {
+    asyncTrain
+}
