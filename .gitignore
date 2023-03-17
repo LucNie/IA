@@ -1,1 +1,4 @@
 node_modules
+chest_Xray/*
+chest_xray_normalized/*
+data/*
