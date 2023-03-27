@@ -6,6 +6,7 @@ const brain = require('brain.js');
 require('dotenv').config();
 const inputFolder = path.join(__dirname, 'chest-Xray');
 const outputFolder = path.join(__dirname, 'normalized-chest-Xray');
+// $env:NODE_OPTIONS="--max-old-space-size=16392"
 
 async function normalizeImagesInFolder(inputFolder, outputFolder) {
   const files = fs.readdirSync(inputFolder);
@@ -46,7 +47,7 @@ async function normalizeImage(imagePath) {
   image.greyscale();
 
   // Appliquer un filtre de contraste automatique
-  image.contrast(0.5);
+  // image.contrast(0.5);
   // redimensionner l'image
   image.resize(1000, 1000);
 
@@ -76,14 +77,9 @@ trainingIA();
 function trainingIA(){
   // Définir la structure du réseau de neurones
   const net = new brain.NeuralNetwork({
-    // Nombre de neurones dans la couche d'entrée
-    // inputSize: 1000 * 1000,
-
-    // Nombre de neurones dans la couche de sortie (2 pour une classification binaire)
-    // outputSize: 2,
 
     // Nombre de couches cachées et nombre de neurones dans chaque couche
-    hiddenLayers: [64, 32, 16],
+    hiddenLayers: [128, 64,32],
   });
 
   // Charger les images normalisées et les étiquettes de classe
@@ -106,7 +102,7 @@ function trainingIA(){
     const filePath = path.join(healthyFolder, file);
     const buffer = fs.readFileSync(filePath);
     const rawimage = Jimp.decoders['image/jpeg'](buffer);
-    const image = new Jimp(rawimage).greyscale();
+    const image = new Jimp(rawimage).greyscale().resize(Number(process.env.IMAGE_HEIGHT), Number(process.env.IMAGE_WIDTH));
     // to json parse
     const jsonbuffer = Array.prototype.slice.call(image.bitmap.data).map((value) => value / 255);
 
@@ -125,7 +121,7 @@ function trainingIA(){
     const filePath = path.join(pneumoniaFolder, file);
     const buffer = fs.readFileSync(filePath);
     const rawimage = Jimp.decoders['image/jpeg'](buffer);
-    const image = new Jimp(rawimage).greyscale();
+    const image = new Jimp(rawimage).greyscale().resize(Number(process.env.IMAGE_HEIGHT), Number(process.env.IMAGE_WIDTH));
     // to json parse
     const jsonbuffer = Array.prototype.slice.call(image.bitmap.data).map((value) => value / 255);
     // 0-255 to 0-1
@@ -137,7 +133,7 @@ function trainingIA(){
       output: [1], // "poumon atteint de pneumonie"
     });
     
-    console.log("poumon atteint de pneumonie" + i + " / " + Math.floor(pneumoniaFiles.length / process.env.DATA_DIVISER));
+    console.log("poumon atteint de pneumonie" + i + " / " + NUMBEROFELEMENTS);
   }
 
   // Mélanger les données d'entraînement
@@ -153,7 +149,7 @@ function trainingIA(){
     iterations: 200,
     log: true,
     logPeriod: 1,
-    learningRate: 0.3,
+    learningRate: 0.01,
   });
 
   // Évaluer le réseau de neurones sur l'ensemble de validation
