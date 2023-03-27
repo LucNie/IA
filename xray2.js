@@ -2,15 +2,25 @@ const fs = require('fs');
 const path = require('path');
 const Jimp = require('jimp');
 const brain = require('brain.js');
+// $env:NODE_OPTIONS="--max-old-space-size=16384"
 // use dotenv to load environment variables from a .env file
 require('dotenv').config();
 const inputFolder = path.join(__dirname, 'chest-Xray');
 const outputFolder = path.join(__dirname, 'normalized-chest-Xray');
 // $env:NODE_OPTIONS="--max-old-space-size=16392"
 
+const net = new brain.NeuralNetwork({
+  // Nombre de couches cachées et nombre de neurones dans chaque couche
+  hiddenLayers: [128, 64, 32],
+
+});
+
+
+trainingIA();
+evaluate(net, { input: [0, 0] });
+
 async function normalizeImagesInFolder(inputFolder, outputFolder) {
   const files = fs.readdirSync(inputFolder);
-
 
 
   // Créer le dossier de sortie s'il n'existe pas
@@ -44,17 +54,12 @@ async function normalizeImage(imagePath) {
   const image = await Jimp.read(imagePath);
 
   // Convertir l'image en niveaux de gris
-  image.greyscale();
 
   // Appliquer un filtre de contraste automatique
-  // image.contrast(0.5);
+
   // redimensionner l'image
   image.resize(1000, 1000);
-
-  // Normaliser l'intensité des pixels entre 0 et 1
-  image.normalize();
-
-  image.quality(70); 
+  image.greyscale();
   // to jpeg
   image.getBufferAsync(Jimp.MIME_JPEG);
 
@@ -69,24 +74,56 @@ async function normalizeImage(imagePath) {
 // normalizeImagesInFolder(path.resolve(inputFolder + '/val/PNEUMONIA'), path.resolve(outputFolder + '/val/PNEUMONIA'));  //done
 
 console.log('Normalisation des images en cours...');
-/* PARTIE IA
-*
-*
-*/
-trainingIA();
-function trainingIA(){
-  // Définir la structure du réseau de neurones
-  const net = new brain.NeuralNetwork({
+function trainingIA() {
 
-    // Nombre de couches cachées et nombre de neurones dans chaque couche
-    hiddenLayers: [128, 64,32],
-  });
+    // Charger les données d'entraînement et de validation
+    const dataset = loadData(path.join(__dirname, 'normalized-chest-Xray/train/NORMAL'), path.join(__dirname, 'normalized-chest-Xray/train/PNEUMONIA'));
 
-  // Charger les images normalisées et les étiquettes de classe
+
+    // Entraîner le réseau de neurones
+    net.train(dataset, {
+      errorThresh: 0.05,
+      iterations: 200,
+      log: true,
+      logPeriod: 1,
+      learningRate: 0.03,
+    });
+
+    // Évaluer le réseau de neurones sur l'ensemble de validation
+    const accuracy = brain.util.getBinaryAccuracy(net, validationData);
+    console.log(`Accuracy: ${accuracy}`);
+
+    // Sauvegarder le réseau de neurones
+    const json = net.toJSON();
+    fs.writeFileSync('xray.json', JSON.stringify(json));
+
+}
+
+// Évaluer le réseau de neurones sur un ensemble de données
+function evaluate(net) {
+
+  const testData = loadData(path.join(__dirname, 'normalized-chest-Xray/test/NORMAL'), path.join(__dirname, 'normalized-chest-Xray/test/PNEUMONIA'));
+
+  let correct = 0;
+  let wrong = 0;
+
+  for (let i = 0; i < testData.length; i++) {
+    const output = net.run(testData[i].input);
+    console.log(`Test ${i} - Output: ${output} - Expected: ${testData[i].output}`);
+    if (output === Math.round(testData[i].output)) {
+      correct++;
+    }
+    else {
+      wrong++;
+    }
+  }
+
+  console.log(`Correct: ${correct} - Wrong: ${wrong}` + ` - Accuracy: ${correct / (correct + wrong)}`);
+
+}
+
+function loadData(healthyFolder,pneumoniaFolder,ignoreDiviser){
   const dataset = [];
-
-  const healthyFolder = path.join(__dirname, 'normalized-chest-Xray/train/NORMAL');
-  const pneumoniaFolder = path.join(__dirname, 'normalized-chest-Xray/train/PNEUMONIA');
 
   const healthyFiles = fs.readdirSync(healthyFolder);
   const pneumoniaFiles = fs.readdirSync(pneumoniaFolder);
@@ -95,7 +132,12 @@ function trainingIA(){
   console.log(Math.floor(healthyFiles.length / process.env.DATA_DIVISER));
   console.log(Math.floor(pneumoniaFiles.length / process.env.DATA_DIVISER));
 
-  const NUMBEROFELEMENTS = Math.floor(healthyFiles.length / process.env.DATA_DIVISER)
+  NUMBEROFELEMENTS = healthyFiles.length;
+  if (!ignoreDiviser) {
+    NUMBEROFELEMENTS = Math.floor(healthyFiles.length / process.env.DATA_DIVISER);
+  }
+
+  console.log("number of elements: " + NUMBEROFELEMENTS);  
 
   for (let i = 0; i < NUMBEROFELEMENTS; i++) {
     const file = healthyFiles[i];
@@ -103,76 +145,64 @@ function trainingIA(){
     const buffer = fs.readFileSync(filePath);
     const rawimage = Jimp.decoders['image/jpeg'](buffer);
     const image = new Jimp(rawimage).greyscale().resize(Number(process.env.IMAGE_HEIGHT), Number(process.env.IMAGE_WIDTH));
-    // to json parse
-    const jsonbuffer = Array.prototype.slice.call(image.bitmap.data).map((value) => value / 255);
 
+    // to json parse
+    const jsonbuffer = Array.prototype.slice.call(image.bitmap.data).map((value) => value / 255); // 0-255 to 0-1
+    const jsonNormal = [];
+    // use 1 data of 4 (4 = 1 pixel)
+    for (let i = 0; i < jsonbuffer.length; i++) {
+      const pixel = jsonbuffer.slice(i, i + 4);
+      jsonNormal.push(pixel[0]);
+    }
 
     dataset.push({
-      input: jsonbuffer,
+      input: jsonNormal,
       output: [0], // "poumon sain"
     });
-    console.log("poumon sain" + i + " / " + NUMBEROFELEMENTS);
+
+    console.log("poumon sain : " + i + " / " + NUMBEROFELEMENTS);
   }
-  
 
-
-  for (let i = 0; i < Math.floor(NUMBEROFELEMENTS); i++) {
+  for (let i = 0; i < NUMBEROFELEMENTS; i++) {
     const file = pneumoniaFiles[i];
     const filePath = path.join(pneumoniaFolder, file);
     const buffer = fs.readFileSync(filePath);
     const rawimage = Jimp.decoders['image/jpeg'](buffer);
     const image = new Jimp(rawimage).greyscale().resize(Number(process.env.IMAGE_HEIGHT), Number(process.env.IMAGE_WIDTH));
     // to json parse
-    const jsonbuffer = Array.prototype.slice.call(image.bitmap.data).map((value) => value / 255);
-    // 0-255 to 0-1
-
-
+    const jsonbuffer = Array.prototype.slice.call(image.bitmap.data).map((value) => value / 255); // 0-255 to 0-1
+    const jsonPneumonia = [];
+    // use 1 data of 4 (4 = 1 pixel) to keep only the greyscale and ignore alpha/color 
+    for (let i = 0; i < jsonbuffer.length; i++) {
+      const pixel = jsonbuffer.slice(i, i + 4);
+      jsonPneumonia.push(pixel[0]);
+    }
 
     dataset.push({
-      input: jsonbuffer,
-      output: [1], // "poumon atteint de pneumonie"
+      input: jsonPneumonia,
+      output: [1], // "pneumonie"
     });
+    console.log("pneumonie : " + i + " / " + NUMBEROFELEMENTS);
+
     
     console.log("poumon atteint de pneumonie" + i + " / " + NUMBEROFELEMENTS);
   }
 
-  // Mélanger les données d'entraînement
-  const shuffledDataset = shuffleArray(dataset);
+  console.log("dataset loaded");
 
-
-
-
-
-  // Entraîner le réseau de neurones
-  net.train(dataset, {
-    errorThresh: 0.005,
-    iterations: 200,
-    log: true,
-    logPeriod: 1,
-    learningRate: 0.01,
-  });
-
-  // Évaluer le réseau de neurones sur l'ensemble de validation
-  const accuracy = brain.util.getBinaryAccuracy(net, validationData);
-  console.log(`Accuracy: ${accuracy}`);
+  return shuttlleArray(dataset);
 }
 
-
-function shuffleArray(array) {
-  let currentIndex = array.length, temporaryValue, randomIndex;
-
-  // Tant qu'il reste des éléments à mélanger
-  while (0 !== currentIndex) {
-
-    // Choisir un élément restant au hasard
-    randomIndex = Math.floor(Math.random() * currentIndex);
-    currentIndex -= 1;
-
-    // Échanger avec l'élément actuel
-    temporaryValue = array[currentIndex];
-    array[currentIndex] = array[randomIndex];
-    array[randomIndex] = temporaryValue;
+function shuttlleArray(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
   }
 
+  console.log("dataset shuffled");
+
   return array;
+
 }
+
+
