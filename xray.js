@@ -11,13 +11,15 @@ const outputFolder = path.join(__dirname, 'normalized-chest-Xray');
 
 const net = new brain.NeuralNetwork({
   // Nombre de couches cachées et nombre de neurones dans chaque couche
-  hiddenLayers: [128, 64, 32],
+  hiddenLayers: [32, 32, 32],
 
 });
 
+if (process.env.IMAGE_NORMALIZE === "false" ){
+  trainingIA();
+  evaluate(net);
+}
 
-trainingIA();
-evaluate(net, { input: [0, 0] });
 
 async function normalizeImagesInFolder(inputFolder, outputFolder) {
   const files = fs.readdirSync(inputFolder);
@@ -65,14 +67,28 @@ async function normalizeImage(imagePath) {
 
   return image;
 }
+if (process.env.IMAGE_NORMALIZE === "true"){
 
-// normalizeImagesInFolder(path.resolve(inputFolder + '/test/NORMAL'), path.resolve(outputFolder + '/test/NORMAL')); //done
-// normalizeImagesInFolder(path.resolve(inputFolder + '/test/PNEUMONIA'), path.resolve(outputFolder + '/test/PNEUMONIA')); //done
-// normalizeImagesInFolder(path.resolve(inputFolder + '/train/NORMAL'), path.resolve(outputFolder + '/train/NORMAL'));  //done
-// normalizeImagesInFolder(path.resolve(inputFolder + '/train/PNEUMONIA'), path.resolve(outputFolder + '/train/PNEUMONIA'));  //done
-// normalizeImagesInFolder(path.resolve(inputFolder + '/val/NORMAL'), path.resolve(outputFolder + '/val/NORMAL'));  //done
-// normalizeImagesInFolder(path.resolve(inputFolder + '/val/PNEUMONIA'), path.resolve(outputFolder + '/val/PNEUMONIA'));  //done
-
+// create dir if not exist
+if (!fs.existsSync(outputFolder)) {
+  fs.mkdirSync(outputFolder);
+  fs.mkdirSync(outputFolder + '/test');
+  fs.mkdirSync(outputFolder + '/test/NORMAL');
+  fs.mkdirSync(outputFolder + '/test/PNEUMONIA');
+  fs.mkdirSync(outputFolder + '/train');
+  fs.mkdirSync(outputFolder + '/train/NORMAL');
+  fs.mkdirSync(outputFolder + '/train/PNEUMONIA');
+  fs.mkdirSync(outputFolder + '/val');
+  fs.mkdirSync(outputFolder + '/val/NORMAL');
+  fs.mkdirSync(outputFolder + '/val/PNEUMONIA');
+}
+normalizeImagesInFolder(path.resolve(inputFolder + '/test/NORMAL'), path.resolve(outputFolder + '/test/NORMAL')); //done
+normalizeImagesInFolder(path.resolve(inputFolder + '/test/PNEUMONIA'), path.resolve(outputFolder + '/test/PNEUMONIA')); //done
+normalizeImagesInFolder(path.resolve(inputFolder + '/train/NORMAL'), path.resolve(outputFolder + '/train/NORMAL'));  //done
+normalizeImagesInFolder(path.resolve(inputFolder + '/train/PNEUMONIA'), path.resolve(outputFolder + '/train/PNEUMONIA'));  //done
+normalizeImagesInFolder(path.resolve(inputFolder + '/val/NORMAL'), path.resolve(outputFolder + '/val/NORMAL'));  //done
+normalizeImagesInFolder(path.resolve(inputFolder + '/val/PNEUMONIA'), path.resolve(outputFolder + '/val/PNEUMONIA'));  //done
+}
 console.log('Normalisation des images en cours...');
 function trainingIA() {
 
@@ -86,7 +102,7 @@ function trainingIA() {
       iterations: 200,
       log: true,
       logPeriod: 1,
-      learningRate: 0.03,
+      learningRate: 0.3,
     });
 
     // Évaluer le réseau de neurones sur l'ensemble de validation
@@ -182,7 +198,7 @@ function loadData(healthyFolder,pneumoniaFolder,ignoreDiviser){
       input: jsonPneumonia,
       output: [1], // "pneumonie"
     });
-    console.log("pneumonie : " + i + " / " + NUMBEROFELEMENTS);
+
 
     
     console.log("poumon atteint de pneumonie" + i + " / " + NUMBEROFELEMENTS);
