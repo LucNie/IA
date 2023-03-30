@@ -10,15 +10,53 @@ const outputFolder = path.join(__dirname, 'normalized-chest-Xray');
 // $env:NODE_OPTIONS="--max-old-space-size=16392"
 
 const net = new brain.NeuralNetwork({
-  // Nombre de couches cachées et nombre de neurones dans chaque couche
-  hiddenLayers: [32, 32, 32],
+
+  layers: [
+    // Couche de convolution avec 8 filtres de 3x3 pixels
+    {
+      type: 'convolutional',
+      filters: 4,
+      size: 3,
+      stride: 1,
+      pad: 1,
+      activation: 'relu',
+      inputShape: [process.env.IMAGE_WIDTH, process.env.IMAGE_HEIGHT, 1],
+    },
+    // Couche de pooling pour réduire la taille de l'image
+    {
+      type: 'pooling',
+      size: 2,
+      stride: 2,
+    },
+    // Couche entièrement connectée pour la classification
+    {
+      type: 'dense',
+      size: 10,
+      activation: 'sigmoid',
+    },
+  ],
 
 });
 
-if (process.env.IMAGE_NORMALIZE === "false" ){
-  trainingIA();
-  evaluate(net);
+
+
+
+if (process.env.IMAGE_VIEW === "true") {
+  viewImage();
+  // wait 5 seconds*
+  console.log('Création des images de visualisation en cours...');
+  setTimeout(function () {
+    trainingIA();
+    evaluate(net);
+  }, 10000);
+
+} else {
+  if (process.env.IMAGE_NORMALIZE === "false") {
+    trainingIA();
+    evaluate(net);
+  }
 }
+
 
 
 async function normalizeImagesInFolder(inputFolder, outputFolder) {
@@ -40,7 +78,7 @@ async function normalizeImagesInFolder(inputFolder, outputFolder) {
     const inputFile = path.join(inputFolder, file);
     const stats = fs.statSync(inputFile);
 
-    if (!stats.isFile()) {
+    if (!stats.isFile()) { // Ignorer les dossiers
       continue;
     }
 
@@ -55,10 +93,6 @@ async function normalizeImagesInFolder(inputFolder, outputFolder) {
 async function normalizeImage(imagePath) {
   const image = await Jimp.read(imagePath);
 
-  // Convertir l'image en niveaux de gris
-
-  // Appliquer un filtre de contraste automatique
-
   // redimensionner l'image
   image.resize(1000, 1000);
   image.greyscale();
@@ -67,51 +101,100 @@ async function normalizeImage(imagePath) {
 
   return image;
 }
-if (process.env.IMAGE_NORMALIZE === "true"){
+if (process.env.IMAGE_NORMALIZE === "true") {
 
-// create dir if not exist
-if (!fs.existsSync(outputFolder)) {
-  fs.mkdirSync(outputFolder);
-  fs.mkdirSync(outputFolder + '/test');
-  fs.mkdirSync(outputFolder + '/test/NORMAL');
-  fs.mkdirSync(outputFolder + '/test/PNEUMONIA');
-  fs.mkdirSync(outputFolder + '/train');
-  fs.mkdirSync(outputFolder + '/train/NORMAL');
-  fs.mkdirSync(outputFolder + '/train/PNEUMONIA');
-  fs.mkdirSync(outputFolder + '/val');
-  fs.mkdirSync(outputFolder + '/val/NORMAL');
-  fs.mkdirSync(outputFolder + '/val/PNEUMONIA');
-}
-normalizeImagesInFolder(path.resolve(inputFolder + '/test/NORMAL'), path.resolve(outputFolder + '/test/NORMAL')); //done
-normalizeImagesInFolder(path.resolve(inputFolder + '/test/PNEUMONIA'), path.resolve(outputFolder + '/test/PNEUMONIA')); //done
-normalizeImagesInFolder(path.resolve(inputFolder + '/train/NORMAL'), path.resolve(outputFolder + '/train/NORMAL'));  //done
-normalizeImagesInFolder(path.resolve(inputFolder + '/train/PNEUMONIA'), path.resolve(outputFolder + '/train/PNEUMONIA'));  //done
-normalizeImagesInFolder(path.resolve(inputFolder + '/val/NORMAL'), path.resolve(outputFolder + '/val/NORMAL'));  //done
-normalizeImagesInFolder(path.resolve(inputFolder + '/val/PNEUMONIA'), path.resolve(outputFolder + '/val/PNEUMONIA'));  //done
+  // create dir if not exist
+  if (!fs.existsSync(outputFolder)) {
+    fs.mkdirSync(outputFolder);
+    fs.mkdirSync(outputFolder + '/test');
+    fs.mkdirSync(outputFolder + '/test/NORMAL');
+    fs.mkdirSync(outputFolder + '/test/PNEUMONIA');
+    fs.mkdirSync(outputFolder + '/train');
+    fs.mkdirSync(outputFolder + '/train/NORMAL');
+    fs.mkdirSync(outputFolder + '/train/PNEUMONIA');
+    fs.mkdirSync(outputFolder + '/val');
+    fs.mkdirSync(outputFolder + '/val/NORMAL');
+    fs.mkdirSync(outputFolder + '/val/PNEUMONIA');
+    fs.mkdirSync(outputFolder + '/view/NORMAL');
+    fs.mkdirSync(outputFolder + '/view/PNEUMONIA');
+  }
+  normalizeImagesInFolder(path.resolve(inputFolder + '/test/NORMAL'), path.resolve(outputFolder + '/test/NORMAL')); //done
+  normalizeImagesInFolder(path.resolve(inputFolder + '/test/PNEUMONIA'), path.resolve(outputFolder + '/test/PNEUMONIA')); //done
+  normalizeImagesInFolder(path.resolve(inputFolder + '/train/NORMAL'), path.resolve(outputFolder + '/train/NORMAL'));  //done
+  normalizeImagesInFolder(path.resolve(inputFolder + '/train/PNEUMONIA'), path.resolve(outputFolder + '/train/PNEUMONIA'));  //done
+  normalizeImagesInFolder(path.resolve(inputFolder + '/val/NORMAL'), path.resolve(outputFolder + '/val/NORMAL'));  //done
+  normalizeImagesInFolder(path.resolve(inputFolder + '/val/PNEUMONIA'), path.resolve(outputFolder + '/val/PNEUMONIA'));  //done
 }
 console.log('Normalisation des images en cours...');
+
+async function viewImage() {
+  console.log('Création des images de visualisation en cours...');
+  const filesNormals = fs.readdirSync(inputFolder + '/test/NORMAL')
+  const filesPneumonia = fs.readdirSync(inputFolder + '/test/PNEUMONIA')
+
+  console.log("filesNormals", filesNormals);
+  console.log("filesPneumonia", filesPneumonia);
+
+  // take the first image
+  const fileNormal = filesNormals[Math.floor(Math.random() * filesNormals.length)];
+  const filePneumonia = filesPneumonia[Math.floor(Math.random() * filesPneumonia.length)];
+  const inputFileNormal = path.join(inputFolder + '/test/NORMAL', fileNormal);
+  const inputFilePneumonia = path.join(inputFolder + '/test/PNEUMONIA', filePneumonia);
+
+  console.log("inputFileNormal", inputFileNormal);
+  console.log("inputFilePneumonia", inputFilePneumonia);
+
+  const imageNormal = await Jimp.read(inputFileNormal)
+  const imagePneumonia = await Jimp.read(inputFilePneumonia)
+  console.log("modification des images en cours...")
+
+  imageNormal.greyscale()
+  imageNormal.resize(Number(process.env.IMAGE_HEIGHT), Number(process.env.IMAGE_WIDTH))
+  imageNormal.threshold({ max: 150 })
+  imageNormal.blur(1);
+
+  imagePneumonia.greyscale()
+  imagePneumonia.resize(Number(process.env.IMAGE_HEIGHT), Number(process.env.IMAGE_WIDTH))
+  imagePneumonia.threshold({ max: 150 })
+  imagePneumonia.blur(1);
+
+
+
+  // get jpeg buffer
+  const imageNormalBuffer = await imageNormal.getBufferAsync(Jimp.MIME_JPEG);
+  const imagePneumoniaBuffer = await imagePneumonia.getBufferAsync(Jimp.MIME_JPEG);
+  
+  await fs.promises.writeFile(path.join( outputFolder + '/view/NORMAL', 'viewNormal.jpg'), imageNormalBuffer);
+  await fs.promises.writeFile(path.join( outputFolder + '/view/PNEUMONIA', 'viewPneumonia.jpg'), imagePneumoniaBuffer);
+
+  console.log('Images de visualisation enregistrées dans le dossier view');
+}
+
+
 function trainingIA() {
 
-    // Charger les données d'entraînement et de validation
-    const dataset = loadData(path.join(__dirname, 'normalized-chest-Xray/train/NORMAL'), path.join(__dirname, 'normalized-chest-Xray/train/PNEUMONIA'));
+  // Charger les données d'entraînement et de validation
+  const dataset = loadData(path.join(__dirname, 'normalized-chest-Xray/train/NORMAL'), path.join(__dirname, 'normalized-chest-Xray/train/PNEUMONIA'));
 
 
-    // Entraîner le réseau de neurones
-    net.train(dataset, {
-      errorThresh: 0.05,
-      iterations: 200,
-      log: true,
-      logPeriod: 1,
-      learningRate: 0.3,
-    });
+  // Entraîner le réseau de neurones
+  net.train(dataset, {
+    errorThreshold: Number(process.envIA_ERROR_THRESHOLD),
+    iterations: Number(process.env.IA_ITERATIONS),
+    log: (process.env.IA_LOG === 'true'),
+    logPeriod: Number(process.env.IA_LOG_PERIOD),
+    learningRate: Number(process.env.IA_LEARNING_RATE),
+    momentum: Number(process.env.IA_MOMENTUM),
+    // activation: Number(process.env.IA_ACTIVATION),
+  });
 
-    // Évaluer le réseau de neurones sur l'ensemble de validation
-    const accuracy = brain.util.getBinaryAccuracy(net, validationData);
-    console.log(`Accuracy: ${accuracy}`);
+  // Évaluer le réseau de neurones sur l'ensemble de validation
+  const accuracy = brain.util.getBinaryAccuracy(net, validationData);
+  console.log(`Accuracy: ${accuracy}`);
 
-    // Sauvegarder le réseau de neurones
-    const json = net.toJSON();
-    fs.writeFileSync('xray.json', JSON.stringify(json));
+  // Sauvegarder le réseau de neurones
+  const json = net.toJSON();
+  fs.writeFileSync('xray.json', JSON.stringify(json));
 
 }
 
@@ -138,7 +221,7 @@ function evaluate(net) {
 
 }
 
-function loadData(healthyFolder,pneumoniaFolder,ignoreDiviser){
+function loadData(healthyFolder, pneumoniaFolder, ignoreDiviser) {
   const dataset = [];
 
   const healthyFiles = fs.readdirSync(healthyFolder);
@@ -153,14 +236,16 @@ function loadData(healthyFolder,pneumoniaFolder,ignoreDiviser){
     NUMBEROFELEMENTS = Math.floor(healthyFiles.length / process.env.DATA_DIVISER);
   }
 
-  console.log("number of elements: " + NUMBEROFELEMENTS);  
+  console.log("number of elements: " + NUMBEROFELEMENTS);
 
   for (let i = 0; i < NUMBEROFELEMENTS; i++) {
     const file = healthyFiles[i];
     const filePath = path.join(healthyFolder, file);
     const buffer = fs.readFileSync(filePath);
     const rawimage = Jimp.decoders['image/jpeg'](buffer);
-    const image = new Jimp(rawimage).greyscale().resize(Number(process.env.IMAGE_HEIGHT), Number(process.env.IMAGE_WIDTH));
+    const image = new Jimp(rawimage).greyscale().resize(Number(process.env.IMAGE_HEIGHT), Number(process.env.IMAGE_WIDTH)).threshold({ max: 150 }).blur(1);
+
+    // write first image to file view /normalizes-chest-Xray/view/normal/0.jpg
 
     // to json parse
     const jsonbuffer = Array.prototype.slice.call(image.bitmap.data).map((value) => value / 255); // 0-255 to 0-1
@@ -176,6 +261,7 @@ function loadData(healthyFolder,pneumoniaFolder,ignoreDiviser){
       output: [0], // "poumon sain"
     });
 
+
     console.log("poumon sain : " + i + " / " + NUMBEROFELEMENTS);
   }
 
@@ -184,13 +270,16 @@ function loadData(healthyFolder,pneumoniaFolder,ignoreDiviser){
     const filePath = path.join(pneumoniaFolder, file);
     const buffer = fs.readFileSync(filePath);
     const rawimage = Jimp.decoders['image/jpeg'](buffer);
-    const image = new Jimp(rawimage).greyscale().resize(Number(process.env.IMAGE_HEIGHT), Number(process.env.IMAGE_WIDTH));
+    const image = new Jimp(rawimage).greyscale().resize(Number(process.env.IMAGE_HEIGHT), Number(process.env.IMAGE_WIDTH)).threshold({max: 150}).blur(1);
+    
     // to json parse
     const jsonbuffer = Array.prototype.slice.call(image.bitmap.data).map((value) => value / 255); // 0-255 to 0-1
     const jsonPneumonia = [];
+
     // use 1 data of 4 (4 = 1 pixel) to keep only the greyscale and ignore alpha/color 
     for (let i = 0; i < jsonbuffer.length; i++) {
       const pixel = jsonbuffer.slice(i, i + 4);
+
       jsonPneumonia.push(pixel[0]);
     }
 
@@ -200,7 +289,7 @@ function loadData(healthyFolder,pneumoniaFolder,ignoreDiviser){
     });
 
 
-    
+
     console.log("poumon atteint de pneumonie" + i + " / " + NUMBEROFELEMENTS);
   }
 
@@ -208,6 +297,8 @@ function loadData(healthyFolder,pneumoniaFolder,ignoreDiviser){
 
   return shuttlleArray(dataset);
 }
+
+
 
 function shuttlleArray(array) {
   for (let i = array.length - 1; i > 0; i--) {
@@ -220,5 +311,3 @@ function shuttlleArray(array) {
   return array;
 
 }
-
-
