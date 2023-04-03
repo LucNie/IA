@@ -11,30 +11,33 @@ const outputFolder = path.join(__dirname, 'normalized-chest-Xray');
 
 const net = new brain.NeuralNetwork({
 
-  layers: [
-    // Couche de convolution avec 8 filtres de 3x3 pixels
-    {
-      type: 'convolutional',
-      filters: 4,
-      size: 3,
-      stride: 1,
-      pad: 1,
-      activation: 'relu',
-      inputShape: [process.env.IMAGE_WIDTH, process.env.IMAGE_HEIGHT, 1],
-    },
-    // Couche de pooling pour réduire la taille de l'image
-    {
-      type: 'pooling',
-      size: 2,
-      stride: 2,
-    },
-    // Couche entièrement connectée pour la classification
-    {
-      type: 'dense',
-      size: 10,
-      activation: 'sigmoid',
-    },
-  ],
+  // layers: [
+  //   // Couche de convolution avec 8 filtres de 3x3 pixels
+  //   {
+  //     type: 'convolutional',
+  //     filters: 4,
+  //     size: 3,
+  //     stride: 1,
+  //     pad: 1,
+  //     activation: 'relu',
+  //     inputShape: [process.env.IMAGE_WIDTH, process.env.IMAGE_HEIGHT, 1],
+  //   },
+  //   // Couche de pooling pour réduire la taille de l'image
+  //   {
+  //     type: 'pooling',
+  //     size: 2,
+  //     stride: 2,
+  //   },
+  //   // Couche entièrement connectée pour la classification
+  //   {
+  //     type: 'dense',
+  //     size: 10,
+  //     activation: 'sigmoid',
+  //   },
+  // ],
+
+  hiddenLayers: [150 , 50 , 25],
+  
 
 });
 
@@ -46,8 +49,10 @@ if (process.env.IMAGE_VIEW === "true") {
   // wait 5 seconds*
   console.log('Création des images de visualisation en cours...');
   setTimeout(function () {
-    trainingIA();
-    evaluate(net);
+    if (process.env.IMAGE_NORMALIZE === "false") {
+      trainingIA();
+      evaluate(net);
+    }
   }, 10000);
 
 } else {
