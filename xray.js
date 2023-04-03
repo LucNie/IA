@@ -120,6 +120,7 @@ if (process.env.IMAGE_NORMALIZE === "true") {
     fs.mkdirSync(outputFolder + '/val');
     fs.mkdirSync(outputFolder + '/val/NORMAL');
     fs.mkdirSync(outputFolder + '/val/PNEUMONIA');
+    fs.mkdirSync(outputFolder + '/view');
     fs.mkdirSync(outputFolder + '/view/NORMAL');
     fs.mkdirSync(outputFolder + '/view/PNEUMONIA');
   }
