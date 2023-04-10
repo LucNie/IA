@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node app.js",
     "xray": "node xray.js",
+    "xray_test": "node xray_test.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {

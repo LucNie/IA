@@ -9,40 +9,11 @@ const inputFolder = path.join(__dirname, 'chest-Xray');
 const outputFolder = path.join(__dirname, 'normalized-chest-Xray');
 // $env:NODE_OPTIONS="--max-old-space-size=16392"
 
-const net = new brain.NeuralNetwork({
+const net = new brain.NeuralNetworkGPU({
 
-  // layers: [
-  //   // Couche de convolution avec 8 filtres de 3x3 pixels
-  //   {
-  //     type: 'convolutional',
-  //     filters: 4,
-  //     size: 3,
-  //     stride: 1,
-  //     pad: 1,
-  //     activation: 'relu',
-  //     inputShape: [process.env.IMAGE_WIDTH, process.env.IMAGE_HEIGHT, 1],
-  //   },
-  //   // Couche de pooling pour réduire la taille de l'image
-  //   {
-  //     type: 'pooling',
-  //     size: 2,
-  //     stride: 2,
-  //   },
-  //   // Couche entièrement connectée pour la classification
-  //   {
-  //     type: 'dense',
-  //     size: 10,
-  //     activation: 'sigmoid',
-  //   },
-  // ],
-
-  hiddenLayers: [150 , 50 , 25],
-  
+hiddenLayers: [100, 25,5],
 
 });
-
-
-
 
 if (process.env.IMAGE_VIEW === "true") {
   viewImage();
@@ -180,10 +151,17 @@ async function viewImage() {
 function trainingIA() {
 
   // Charger les données d'entraînement et de validation
-  const dataset = loadData(path.join(__dirname, 'normalized-chest-Xray/train/NORMAL'), path.join(__dirname, 'normalized-chest-Xray/train/PNEUMONIA'));
+
+
+
 
 
   // Entraîner le réseau de neurones
+
+  for (let i = 0; i < process.env.ROTATION_NUMBER; i++) {
+
+    console.log("Start rotation number ", i);
+    const dataset = loadData(path.join(__dirname, 'normalized-chest-Xray/train/NORMAL'), path.join(__dirname, 'normalized-chest-Xray/train/PNEUMONIA'));
   net.train(dataset, {
     errorThreshold: Number(process.envIA_ERROR_THRESHOLD),
     iterations: Number(process.env.IA_ITERATIONS),
@@ -194,13 +172,16 @@ function trainingIA() {
     // activation: Number(process.env.IA_ACTIVATION),
   });
 
+  console.log("End rotation number ", i);
+}
+
   // Évaluer le réseau de neurones sur l'ensemble de validation
-  const accuracy = brain.util.getBinaryAccuracy(net, validationData);
-  console.log(`Accuracy: ${accuracy}`);
+  // const accuracy = brain.util.getBinaryAccuracy(net, validationData);
+  // console.log(`Accuracy: ${accuracy}`);
 
   // Sauvegarder le réseau de neurones
   const json = net.toJSON();
-  fs.writeFileSync('xray.json', JSON.stringify(json));
+  fs.writeFileSync("Xray_T" + process.env.IMAGE_HEIGHT+'_LR'+ process.env.IA_LEARNING_RATE+'_MO'+process.env.IA_MOMENTUM+'_ERR'+ process.env.IA_ERROR_THRESHOLD + '.json', JSON.stringify(json));
 
 }
 
@@ -232,20 +213,18 @@ function loadData(healthyFolder, pneumoniaFolder, ignoreDiviser) {
 
   const healthyFiles = fs.readdirSync(healthyFolder);
   const pneumoniaFiles = fs.readdirSync(pneumoniaFolder);
-  console.log(healthyFiles.length);
-  console.log(pneumoniaFiles.length);
-  console.log(Math.floor(healthyFiles.length / process.env.DATA_DIVISER));
-  console.log(Math.floor(pneumoniaFiles.length / process.env.DATA_DIVISER));
+
 
   NUMBEROFELEMENTS = healthyFiles.length;
   if (!ignoreDiviser) {
-    NUMBEROFELEMENTS = Math.floor(healthyFiles.length / process.env.DATA_DIVISER);
+    NUMBEROFELEMENTS = Math.floor(healthyFiles.length / (process.env.DATA_DIVISER * process.env.ROTATION_NUMBER)) ;
   }
 
   console.log("number of elements: " + NUMBEROFELEMENTS);
+  console.log("Start loading healthy data");
 
   for (let i = 0; i < NUMBEROFELEMENTS; i++) {
-    const file = healthyFiles[i];
+    const file = healthyFiles[Math.floor(Math.random() * healthyFiles.length)];
     const filePath = path.join(healthyFolder, file);
     const buffer = fs.readFileSync(filePath);
     const rawimage = Jimp.decoders['image/jpeg'](buffer);
@@ -257,9 +236,8 @@ function loadData(healthyFolder, pneumoniaFolder, ignoreDiviser) {
     const jsonbuffer = Array.prototype.slice.call(image.bitmap.data).map((value) => value / 255); // 0-255 to 0-1
     const jsonNormal = [];
     // use 1 data of 4 (4 = 1 pixel)
-    for (let i = 0; i < jsonbuffer.length; i++) {
-      const pixel = jsonbuffer.slice(i, i + 4);
-      jsonNormal.push(pixel[0]);
+    for (let i = 0; i < jsonbuffer.length; i += 4) {
+      jsonNormal.push(jsonbuffer[i]);
     }
 
     dataset.push({
@@ -268,8 +246,11 @@ function loadData(healthyFolder, pneumoniaFolder, ignoreDiviser) {
     });
 
 
-    console.log("poumon sain : " + i + " / " + NUMBEROFELEMENTS);
+    // console.log("poumon sain : " + i + " / " + NUMBEROFELEMENTS);
   }
+
+  console.log("loading healthy data done")
+  console.log("Start loading pneumonia data");
 
   for (let i = 0; i < NUMBEROFELEMENTS; i++) {
     const file = pneumoniaFiles[i];
@@ -281,25 +262,21 @@ function loadData(healthyFolder, pneumoniaFolder, ignoreDiviser) {
     // to json parse
     const jsonbuffer = Array.prototype.slice.call(image.bitmap.data).map((value) => value / 255); // 0-255 to 0-1
     const jsonPneumonia = [];
-
+  
     // use 1 data of 4 (4 = 1 pixel) to keep only the greyscale and ignore alpha/color 
-    for (let i = 0; i < jsonbuffer.length; i++) {
-      const pixel = jsonbuffer.slice(i, i + 4);
-
-      jsonPneumonia.push(pixel[0]);
-    }
+    for (let i = 0; i < jsonbuffer.length; i += 4) {
+      jsonPneumonia.push(jsonbuffer[i]);
+    }   
 
     dataset.push({
       input: jsonPneumonia,
       output: [1], // "pneumonie"
     });
 
-
-
-    console.log("poumon atteint de pneumonie" + i + " / " + NUMBEROFELEMENTS);
   }
+  console.log("loading pneumonia data done")
 
-  console.log("dataset loaded");
+  console.log("dataset loaded !");
 
   return shuttlleArray(dataset);
 }
