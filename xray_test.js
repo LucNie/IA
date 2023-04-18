@@ -8,7 +8,7 @@ const inputFolder = path.join(__dirname, 'chest-Xray');
 const outputFolder = path.join(__dirname, 'normalized-chest-Xray');
 
 const net = new brain.NeuralNetwork();
-const networkName = "Xray_T128_LR0.05_MO0.05_ERR0.05.json"
+const networkName = "Xray_T128_LR0.1_MO0.1_ERR0.1.json"
 const network = JSON.parse(fs.readFileSync(path.join(__dirname, networkName), 'utf8'));
 const testData = loadData(path.join(__dirname, 'normalized-chest-Xray/test/NORMAL'), path.join(__dirname, 'normalized-chest-Xray/test/PNEUMONIA'),false);
 const valData = loadData(path.join(__dirname, 'normalized-chest-Xray/val/NORMAL'), path.join(__dirname, 'normalized-chest-Xray/val/PNEUMONIA'),false);
@@ -59,8 +59,6 @@ function test(){
     console.log("correct: " + correct);
     console.log("incorrect: " + incorrect);
     console.log("accuracy: " + (correct / (correct + incorrect)) * 100 + "%");
-
-
 
 
 }

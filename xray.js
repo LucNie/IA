@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const Jimp = require('jimp');
 const brain = require('brain.js');
+const flatted = require('flatted');
 // $env:NODE_OPTIONS="--max-old-space-size=16384"
 // use dotenv to load environment variables from a .env file
 require('dotenv').config();
@@ -11,8 +12,13 @@ const outputFolder = path.join(__dirname, 'normalized-chest-Xray');
 
 const net = new brain.NeuralNetworkGPU({
 
-hiddenLayers: [100, 25,5],
-
+hiddenLayers: [2048, 1024, 512]
+// layers: [
+//   { type: 'input', size: 16384 },
+//   { type: 'dense', size: 128, activation: 'sigmoid' },
+//   { type: 'dense', size: 64, activation: 'sigmoid' },
+//   { type: 'dense', size: 5, activation: 'sigmoid' }
+// ],
 });
 
 if (process.env.IMAGE_VIEW === "true") {
@@ -22,14 +28,12 @@ if (process.env.IMAGE_VIEW === "true") {
   setTimeout(function () {
     if (process.env.IMAGE_NORMALIZE === "false") {
       trainingIA();
-      evaluate(net);
     }
   }, 10000);
 
 } else {
   if (process.env.IMAGE_NORMALIZE === "false") {
     trainingIA();
-    evaluate(net);
   }
 }
 
@@ -144,6 +148,8 @@ async function viewImage() {
   await fs.promises.writeFile(path.join( outputFolder + '/view/NORMAL', 'viewNormal.jpg'), imageNormalBuffer);
   await fs.promises.writeFile(path.join( outputFolder + '/view/PNEUMONIA', 'viewPneumonia.jpg'), imagePneumoniaBuffer);
 
+  console.log("Size of imageNormalBuffer", imageNormalBuffer.length);
+
   console.log('Images de visualisation enregistrées dans le dossier view');
 }
 
@@ -152,7 +158,7 @@ function trainingIA() {
 
   // Charger les données d'entraînement et de validation
 
-
+  IAStartLog()
 
 
 
@@ -163,7 +169,7 @@ function trainingIA() {
     console.log("Start rotation number ", i);
     const dataset = loadData(path.join(__dirname, 'normalized-chest-Xray/train/NORMAL'), path.join(__dirname, 'normalized-chest-Xray/train/PNEUMONIA'));
   net.train(dataset, {
-    errorThreshold: Number(process.envIA_ERROR_THRESHOLD),
+    errorThreshold: Number(process.env.IA_ERROR_THRESHOLD),
     iterations: Number(process.env.IA_ITERATIONS),
     log: (process.env.IA_LOG === 'true'),
     logPeriod: Number(process.env.IA_LOG_PERIOD),
@@ -181,8 +187,18 @@ function trainingIA() {
 
   // Sauvegarder le réseau de neurones
   const json = net.toJSON();
-  fs.writeFileSync("Xray_T" + process.env.IMAGE_HEIGHT+'_LR'+ process.env.IA_LEARNING_RATE+'_MO'+process.env.IA_MOMENTUM+'_ERR'+ process.env.IA_ERROR_THRESHOLD + '.json', JSON.stringify(json));
 
+
+  let out="[";
+  for(let indx=0;indx<json.length-1;indx++){
+    out+=JSON.stringify(json[indx],null,4)+",";
+  }
+  out+=JSON.stringify(json[json.length-1],null,4)+"]";
+
+  fs.writeFileSync("Xray_T" + process.env.IMAGE_HEIGHT+'_LR'+ process.env.IA_LEARNING_RATE+'_MO'+process.env.IA_MOMENTUM+'_ERR'+ process.env.IA_ERROR_THRESHOLD + '.json', out);
+  console.log("IA saved");
+ 
+  evaluate(net);
 }
 
 // Évaluer le réseau de neurones sur un ensemble de données
@@ -190,21 +206,51 @@ function evaluate(net) {
 
   const testData = loadData(path.join(__dirname, 'normalized-chest-Xray/test/NORMAL'), path.join(__dirname, 'normalized-chest-Xray/test/PNEUMONIA'));
 
+
   let correct = 0;
-  let wrong = 0;
+  let incorrect = 0;
 
   for (let i = 0; i < testData.length; i++) {
-    const output = net.run(testData[i].input);
-    console.log(`Test ${i} - Output: ${output} - Expected: ${testData[i].output}`);
-    if (output === Math.round(testData[i].output)) {
-      correct++;
-    }
-    else {
-      wrong++;
-    }
+      const test = testData[i];
+      const result = net.run(test.input);
+      const output = result[0] > 0.5 ? 1 : 0;
+      const expected = test.output[0];
+      if (output === expected) {
+          correct++;
+      } else {
+          incorrect++;
+      }
+  }
+  console.log("test data");
+  console.log("correct: " + correct);
+  console.log("incorrect: " + incorrect);
+  console.log("accuracy: " + (correct / (correct + incorrect)) * 100 + "%");
+
+  // validation
+  correct = 0;
+  incorrect = 0;
+
+  const valData = loadData(path.join(__dirname, 'normalized-chest-Xray/val/NORMAL'), path.join(__dirname, 'normalized-chest-Xray/val/PNEUMONIA'));
+
+  for (let i = 0; i < valData.length; i++) {
+      const test = valData[i];
+      const result = net.run(test.input);
+      const output = result[0] > 0.5 ? 1 : 0;
+      const expected = test.output[0];
+      if (output === expected) {
+          correct++;
+      } else {
+          incorrect++;
+      }
   }
 
-  console.log(`Correct: ${correct} - Wrong: ${wrong}` + ` - Accuracy: ${correct / (correct + wrong)}`);
+  console.log("validation data");
+  console.log("correct: " + correct);
+  console.log("incorrect: " + incorrect);
+  console.log("accuracy: " + (correct / (correct + incorrect)) * 100 + "%");
+
+
+  console.log(`Correct: ${correct} - Wrong: ${incorrect}` + ` - Accuracy: ${correct / (correct + incorrect)}`);
 
 }
 
@@ -282,7 +328,6 @@ function loadData(healthyFolder, pneumoniaFolder, ignoreDiviser) {
 }
 
 
-
 function shuttlleArray(array) {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -294,3 +339,17 @@ function shuttlleArray(array) {
   return array;
 
 }
+
+function IAStartLog() {
+  console.log(`Image size: \x1b[33m%s\x1b[0m`, ` ${process.env.IMAGE_HEIGHT}x${process.env.IMAGE_WIDTH}`);
+  console.log(`Image normalization: \x1b[33m%s\x1b[0m`, `${process.env.IMAGE_NORMALIZE}`);
+  console.log(`IA error threshold: \x1b[33m%s\x1b[0m`, `${process.env.IA_ERROR_THRESHOLD}`);
+  console.log(`IA iterations: \x1b[33m%s\x1b[0m`, `${process.env.IA_ITERATIONS}`);
+  console.log(`IA learning rate: \x1b[33m%s\x1b[0m`, `${process.env.IA_LEARNING_RATE}`);
+  console.log(`IA momentum: \x1b[33m%s\x1b[0m`, `${process.env.IA_MOMENTUM}`);
+  console.log(`IA activation function: \x1b[33m%s\x1b[0m`, `${process.env.IA_ACTIVATION}`);
+  console.log(`IA number of hidden layers: \x1b[33m%s\x1b[0m`, `${process.env.IA_HIDDEN_LAYER}`);
+  console.log(`IA logging: \x1b[33m%s\x1b[0m`, `${process.env.IA_LOG}`);
+  console.log(`IA logging period: \x1b[33m%s\x1b[0m`, `${process.env.IA_LOG_PERIOD}`);
+}
+

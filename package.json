@@ -24,6 +24,7 @@
     "brain.js": "^2.0.0-beta.18",
     "deasync": "^0.1.28",
     "dotenv": "^16.0.3",
+    "flatted": "^3.2.7",
     "fs": "^0.0.1-security",
     "gpu.js": "^2.16.0",
     "heapdump": "^0.3.15",
