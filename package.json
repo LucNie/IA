@@ -21,6 +21,7 @@
   "homepage": "https://github.com/LucNie/IA#readme",
   "dependencies": {
     "@jimp/plugin-threshold": "^0.22.7",
+    "big-json": "^3.2.0",
     "brain.js": "^2.0.0-beta.18",
     "deasync": "^0.1.28",
     "dotenv": "^16.0.3",

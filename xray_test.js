@@ -2,14 +2,15 @@ const fs = require('fs');
 const path = require('path');
 const Jimp = require('jimp');
 const brain = require('brain.js');
-
+const json = require('big-json');
 require('dotenv').config();
 const inputFolder = path.join(__dirname, 'chest-Xray');
 const outputFolder = path.join(__dirname, 'normalized-chest-Xray');
 
 const net = new brain.NeuralNetwork();
-const networkName = "Xray_T128_LR0.1_MO0.1_ERR0.1.json"
-const network = JSON.parse(fs.readFileSync(path.join(__dirname, networkName), 'utf8'));
+const networkName = "Xray_T128_LR0.01_MO0.05_ERR0.001.json"
+const network = json.parse(fs.readFileSync(path.join(__dirname, networkName)));
+console.log(network);
 const testData = loadData(path.join(__dirname, 'normalized-chest-Xray/test/NORMAL'), path.join(__dirname, 'normalized-chest-Xray/test/PNEUMONIA'),false);
 const valData = loadData(path.join(__dirname, 'normalized-chest-Xray/val/NORMAL'), path.join(__dirname, 'normalized-chest-Xray/val/PNEUMONIA'),false);
 
@@ -116,7 +117,7 @@ function loadData(healthyFolder, pneumoniaFolder, ignoreDiviser) {
       const filePath = path.join(pneumoniaFolder, file);
       const buffer = fs.readFileSync(filePath);
       const rawimage = Jimp.decoders['image/jpeg'](buffer);
-      const image = new Jimp(rawimage).greyscale().resize(tailleImage, tailleImage).threshold({max: 150}).blur(1);
+      const image = new Jimp(rawimage).resize(tailleImage, tailleImage).threshold({max: 150}).blur(1);
       
       // to json parse
       const jsonbuffer = Array.prototype.slice.call(image.bitmap.data).map((value) => value / 255); // 0-255 to 0-1

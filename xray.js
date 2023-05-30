@@ -2,26 +2,19 @@ const fs = require('fs');
 const path = require('path');
 const Jimp = require('jimp');
 const brain = require('brain.js');
-const flatted = require('flatted');
-// $env:NODE_OPTIONS="--max-old-space-size=16384"
-// use dotenv to load environment variables from a .env file
+// const tf = require('@tensorflow/tfjs-node');
+
 require('dotenv').config();
-const inputFolder = path.join(__dirname, 'chest-Xray');
+const inputFolder = path.join(__dirname, 'chest_Xray');
 const outputFolder = path.join(__dirname, 'normalized-chest-Xray');
 // $env:NODE_OPTIONS="--max-old-space-size=16392"
 
 const net = new brain.NeuralNetworkGPU({
-
-hiddenLayers: [2048, 1024, 512]
-// layers: [
-//   { type: 'input', size: 16384 },
-//   { type: 'dense', size: 128, activation: 'sigmoid' },
-//   { type: 'dense', size: 64, activation: 'sigmoid' },
-//   { type: 'dense', size: 5, activation: 'sigmoid' }
-// ],
+  hiddenLayers: [400,350],
+  convolutional: true,
 });
 
-if (process.env.IMAGE_VIEW === "true") {
+if (process.env.IMAGE_VIEW === "true" && process.env.IMAGE_NORMALIZE === "false") {
   viewImage();
   // wait 5 seconds*
   console.log('Création des images de visualisation en cours...');
@@ -32,7 +25,7 @@ if (process.env.IMAGE_VIEW === "true") {
   }, 10000);
 
 } else {
-  if (process.env.IMAGE_NORMALIZE === "false") {
+  if (process.env.IMAGE_NORMALIZE === "false" && process.env.IMAGE_VIEW === "false") {
     trainingIA();
   }
 }
@@ -81,6 +74,7 @@ async function normalizeImage(imagePath) {
 
   return image;
 }
+
 if (process.env.IMAGE_NORMALIZE === "true") {
 
   // create dir if not exist
@@ -125,19 +119,11 @@ async function viewImage() {
   console.log("inputFileNormal", inputFileNormal);
   console.log("inputFilePneumonia", inputFilePneumonia);
 
-  const imageNormal = await Jimp.read(inputFileNormal)
-  const imagePneumonia = await Jimp.read(inputFilePneumonia)
+  const imageNormal = idleImage(await Jimp.read(inputFileNormal))
+  const imagePneumonia = idleImage( await Jimp.read(inputFilePneumonia))
   console.log("modification des images en cours...")
 
-  imageNormal.greyscale()
-  imageNormal.resize(Number(process.env.IMAGE_HEIGHT), Number(process.env.IMAGE_WIDTH))
-  imageNormal.threshold({ max: 150 })
-  imageNormal.blur(1);
 
-  imagePneumonia.greyscale()
-  imagePneumonia.resize(Number(process.env.IMAGE_HEIGHT), Number(process.env.IMAGE_WIDTH))
-  imagePneumonia.threshold({ max: 150 })
-  imagePneumonia.blur(1);
 
 
 
@@ -186,16 +172,12 @@ function trainingIA() {
   // console.log(`Accuracy: ${accuracy}`);
 
   // Sauvegarder le réseau de neurones
-  const json = net.toJSON();
 
+  const out = net.toJSON();
 
-  let out="[";
-  for(let indx=0;indx<json.length-1;indx++){
-    out+=JSON.stringify(json[indx],null,4)+",";
-  }
-  out+=JSON.stringify(json[json.length-1],null,4)+"]";
+  const out2 = JSON.stringify(out);
 
-  fs.writeFileSync("Xray_T" + process.env.IMAGE_HEIGHT+'_LR'+ process.env.IA_LEARNING_RATE+'_MO'+process.env.IA_MOMENTUM+'_ERR'+ process.env.IA_ERROR_THRESHOLD + '.json', out);
+  fs.writeFileSync("Xray_T" + process.env.IMAGE_HEIGHT+'_LR'+ process.env.IA_LEARNING_RATE+'_MO'+process.env.IA_MOMENTUM+'_ERR'+ process.env.IA_ERROR_THRESHOLD + '.json', out2 );
   console.log("IA saved");
  
   evaluate(net);
@@ -288,7 +270,7 @@ function loadData(healthyFolder, pneumoniaFolder, ignoreDiviser) {
 
     dataset.push({
       input: jsonNormal,
-      output: [0], // "poumon sain"
+      output: [0,1] // 0 = normal
     });
 
 
@@ -316,7 +298,7 @@ function loadData(healthyFolder, pneumoniaFolder, ignoreDiviser) {
 
     dataset.push({
       input: jsonPneumonia,
-      output: [1], // "pneumonie"
+      output: [1,0] // 1 = pneumonia
     });
 
   }
@@ -353,3 +335,13 @@ function IAStartLog() {
   console.log(`IA logging period: \x1b[33m%s\x1b[0m`, `${process.env.IA_LOG_PERIOD}`);
 }
 
+function idleImage(aImage){
+
+  aImage.greyscale()
+  aImage.resize(Number(process.env.IMAGE_HEIGHT), Number(process.env.IMAGE_WIDTH))
+  // aImage.threshold({ max: 100 })
+  aImage.blur(1);
+
+  return aImage;
+
+}
